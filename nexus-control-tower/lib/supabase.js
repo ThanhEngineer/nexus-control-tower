@@ -1,28 +1,19 @@
 // lib/supabase.js
-const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Tất cả DB calls đi qua /api/db (server-side, service_role key)
+// Browser không bao giờ gọi Supabase trực tiếp — anon key không còn cần thiết
 
-async function sb(method, table, body = null, query = '') {
-  const url = `${SB_URL}/rest/v1/${table}${query}`;
-  const res = await fetch(url, {
-    method,
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: body ? JSON.stringify(body) : null,
+async function dbProxy(method, table, body = null, query = '') {
+  const res = await fetch('/api/db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, table, body, query }),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'DB error');
+  return data;
 }
 
-export const sbGet   = (table, q = '') => sb('GET',   table, null, q);
-export const sbPost  = (table, b)      => sb('POST',  table, b);
-export const sbPatch = (table, b, q)   => sb('PATCH', table, b, q);
-export const sbDel   = (table, q)      => sb('DELETE',table, null, q);
+export const sbGet   = (table, q = '') => dbProxy('GET',    table, null, q);
+export const sbPost  = (table, b)      => dbProxy('POST',   table, b);
+export const sbPatch = (table, b, q)   => dbProxy('PATCH',  table, b, q);
+export const sbDel   = (table, q)      => dbProxy('DELETE', table, null, q);
